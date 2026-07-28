@@ -3,7 +3,6 @@ from routers import productos, categorias
  
 app = FastAPI(title="API de la Tienda")
  
-# Conectamos los routers de cada recurso
 app.include_router(productos.router)
 app.include_router(categorias.router)
  
