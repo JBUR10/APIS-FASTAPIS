@@ -53,3 +53,21 @@ FastAPI genera automáticamente la documentación de la API.
 - `PUT /categorias/{id}`
 - `DELETE /categorias/{id}`
 
+### Empleados
+
+- `GET /empleados`
+- `GET /empleados/{id}`
+- `POST /empleados`
+- `PUT /empleados/{id}`
+- `DELETE /empleados/{id}`
+
+### Proveedores
+
+- `GET /proveedores`
+- `GET /proveedores/{id}`
+- `POST /proveedores`
+- `PUT /proveedores/{id}`
+- `DELETE /proveedores/{id}`
+
+
+

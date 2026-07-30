@@ -1,44 +1,44 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
- 
-# El router agrupa los endpoints de productos.
+
 router = APIRouter(prefix="/productos", tags=["Productos"])
- 
-# Modelo de entrada (sin id: lo asigna el servidor)
+
 class ProductoEntrada(BaseModel):
-	nombre: str
-	precio: float
-	categoria: str
- 
-# "Base de datos" en memoria
+    nombre: str
+    precio: float
+    categoria: str
+    proveedor: str
+
 productos = [
-	{"id": 1, "nombre": "Teclado mecanico", "precio": 120000, "categoria": "Perifericos"},
-	{"id": 2, "nombre": "Mouse gamer",      "precio": 85000,  "categoria": "Perifericos"},
-	{"id": 3, "nombre": "Monitor 24",       "precio": 650000, "categoria": "Pantallas"},
+    {"id": 1, "nombre": "Teclado mecanico", "precio": 120000, "categoria": "Perifericos", "proveedor": "Manzana (Apol)"},
+    {"id": 2, "nombre": "Mouse gamer", "precio": 85000, "categoria": "Perifericos", "proveedor": "Flamingo"},
+    {"id": 3, "nombre": "Monitor 24", "precio": 650000, "categoria": "Pantallas", "proveedor": "Distribuciones Metrio"},
 ]
-# READ - listar todos         GET /productos
+
 @router.get("")
 def listar_productos():
     return productos
- 
-# READ - obtener uno          GET /productos/{producto_id}
+
 @router.get("/{producto_id}")
 def obtener_producto(producto_id: int):
     for producto in productos:
         if producto["id"] == producto_id:
             return producto
     raise HTTPException(status_code=404, detail="Producto no encontrado")
- 
-# CREATE - crear              POST /productos
+
 @router.post("", status_code=201)
 def crear_producto(datos: ProductoEntrada):
     nuevo_id = max((p["id"] for p in productos), default=0) + 1
-    nuevo = {"id": nuevo_id, "nombre": datos.nombre,
-             "precio": datos.precio, "categoria": datos.categoria}
+    nuevo = {
+        "id": nuevo_id,
+        "nombre": datos.nombre,
+        "precio": datos.precio,
+        "categoria": datos.categoria,
+        "proveedor": datos.proveedor
+    }
     productos.append(nuevo)
     return {"mensaje": "Producto creado", "producto": nuevo}
- 
-# UPDATE - actualizar         PUT /productos/{producto_id}
+
 @router.put("/{producto_id}")
 def actualizar_producto(producto_id: int, datos: ProductoEntrada):
     for producto in productos:
@@ -46,10 +46,10 @@ def actualizar_producto(producto_id: int, datos: ProductoEntrada):
             producto["nombre"] = datos.nombre
             producto["precio"] = datos.precio
             producto["categoria"] = datos.categoria
+            producto["proveedor"] = datos.proveedor
             return {"mensaje": "Producto actualizado", "producto": producto}
     raise HTTPException(status_code=404, detail="Producto no encontrado")
- 
-# DELETE - eliminar           DELETE /productos/{producto_id}
+
 @router.delete("/{producto_id}")
 def eliminar_producto(producto_id: int):
     for producto in productos:
