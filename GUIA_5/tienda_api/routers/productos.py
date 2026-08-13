@@ -10,7 +10,8 @@ router = APIRouter(prefix="/productos", tags=["Productos"])
 class ProductoEntrada(BaseModel):
     nombre: str
     precio: float
-    categoria_id: int
+    id_categoria: int
+    id_proveedor: int
 
 
 @router.get("")
@@ -20,14 +21,18 @@ def listar_productos():
     cursor = conexion.cursor()
     cursor.execute("""
         SELECT
-            productos.id,
-            productos.nombre,
-            productos.precio,
-            productos.categoria_id,
-            categorias.nombre AS categoria
-        FROM productos
-        JOIN categorias
-            ON productos.categoria_id = categorias.id
+            p.id,
+            p.nombre,
+            p.precio,
+            p.id_categoria,
+            c.nombre AS categoria,
+            p.id_proveedor,
+            pr.nombre AS proveedor
+        FROM Producto p
+        JOIN Categoria c
+            ON p.id_categoria = c.id
+        JOIN Proveedor pr
+            ON p.id_proveedor = pr.id
     """)
 
     filas = cursor.fetchall()
@@ -42,75 +47,105 @@ def obtener_producto(producto_id: int):
     conexion = db.obtener_conexion()
 
     cursor = conexion.cursor()
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT
-            productos.id,
-            productos.nombre,
-            productos.precio,
-            productos.categoria_id,
-            categorias.nombre AS categoria
-        FROM productos
-        JOIN categorias
-            ON productos.categoria_id = categorias.id
-        WHERE productos.id = ?
-    """,
-        (producto_id,),
-    )
+            p.id,
+            p.nombre,
+            p.precio,
+            p.id_categoria,
+            c.nombre AS categoria,
+            p.id_proveedor,
+            pr.nombre AS proveedor
+        FROM Producto p
+        JOIN Categoria c
+            ON p.id_categoria = c.id
+        JOIN Proveedor pr
+            ON p.id_proveedor = pr.id
+        WHERE p.id = ?
+    """, (producto_id,))
 
     fila = cursor.fetchone()
 
     conexion.close()
 
     if fila is None:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
+        raise HTTPException(
+            status_code=404,
+            detail="Producto no encontrado"
+        )
 
     return dict(fila)
 
 
 @router.post("", status_code=201)
 def crear_producto(
-    datos: ProductoEntrada, usuario: dict = Depends(seguridad.obtener_usuario_actual)
+    datos: ProductoEntrada,
+    usuario: dict = Depends(seguridad.obtener_usuario_actual)
 ):
     conexion = db.obtener_conexion()
     cursor = conexion.cursor()
 
-    cursor.execute("SELECT id FROM categorias WHERE id = ?", (datos.categoria_id,))
+    cursor.execute(
+        "SELECT id FROM Categoria WHERE id = ?",
+        (datos.id_categoria,)
+    )
 
     categoria = cursor.fetchone()
 
     if categoria is None:
         conexion.close()
 
-        raise HTTPException(status_code=400, detail="La categoría no existe")
+        raise HTTPException(
+            status_code=400,
+            detail="La categoría no existe"
+        )
 
     cursor.execute(
-        """
-        INSERT INTO productos (nombre, precio, categoria_id)
-        VALUES (?, ?, ?)
-    """,
-        (datos.nombre, datos.precio, datos.categoria_id),
+        "SELECT id FROM Proveedor WHERE id = ?",
+        (datos.id_proveedor,)
     )
+
+    proveedor = cursor.fetchone()
+
+    if proveedor is None:
+        conexion.close()
+
+        raise HTTPException(
+            status_code=400,
+            detail="El proveedor no existe"
+        )
+
+    cursor.execute("""
+        INSERT INTO Producto
+        (nombre, precio, id_categoria, id_proveedor)
+        VALUES (?, ?, ?, ?)
+    """, (
+        datos.nombre,
+        datos.precio,
+        datos.id_categoria,
+        datos.id_proveedor
+    ))
 
     conexion.commit()
 
     nuevo_id = cursor.lastrowid
 
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT
-            productos.id,
-            productos.nombre,
-            productos.precio,
-            productos.categoria_id,
-            categorias.nombre AS categoria
-        FROM productos
-        JOIN categorias
-            ON productos.categoria_id = categorias.id
-        WHERE productos.id = ?
-    """,
-        (nuevo_id,),
-    )
+            p.id,
+            p.nombre,
+            p.precio,
+            p.id_categoria,
+            c.nombre AS categoria,
+            p.id_proveedor,
+            pr.nombre AS proveedor
+        FROM Producto p
+        JOIN Categoria c
+            ON p.id_categoria = c.id
+        JOIN Proveedor pr
+            ON p.id_proveedor = pr.id
+        WHERE p.id = ?
+    """, (nuevo_id,))
 
     fila = cursor.fetchone()
 
@@ -119,7 +154,7 @@ def crear_producto(
     return {
         "mensaje": "Producto creado",
         "producto": dict(fila),
-        "creado_por": usuario["username"],
+        "creado_por": usuario["username"]
     }
 
 
@@ -127,55 +162,78 @@ def crear_producto(
 def actualizar_producto(
     producto_id: int,
     datos: ProductoEntrada,
-    usuario: dict = Depends(seguridad.obtener_usuario_actual),
+    usuario: dict = Depends(seguridad.obtener_usuario_actual)
 ):
     conexion = db.obtener_conexion()
     cursor = conexion.cursor()
 
-    cursor.execute("SELECT id FROM categorias WHERE id = ?", (datos.categoria_id,))
+    cursor.execute(
+        "SELECT id FROM Categoria WHERE id = ?",
+        (datos.id_categoria,)
+    )
 
-    categoria = cursor.fetchone()
-
-    if categoria is None:
+    if cursor.fetchone() is None:
         conexion.close()
 
-        raise HTTPException(status_code=400, detail="La categoría no existe")
+        raise HTTPException(
+            status_code=400,
+            detail="La categoría no existe"
+        )
 
     cursor.execute(
-        """
-        UPDATE productos
+        "SELECT id FROM Proveedor WHERE id = ?",
+        (datos.id_proveedor,)
+    )
+
+    if cursor.fetchone() is None:
+        conexion.close()
+
+        raise HTTPException(
+            status_code=400,
+            detail="El proveedor no existe"
+        )
+
+    cursor.execute("""
+        UPDATE Producto
         SET nombre = ?,
             precio = ?,
-            categoria_id = ?
+            id_categoria = ?,
+            id_proveedor = ?
         WHERE id = ?
-    """,
-        (datos.nombre, datos.precio, datos.categoria_id, producto_id),
-    )
+    """, (
+        datos.nombre,
+        datos.precio,
+        datos.id_categoria,
+        datos.id_proveedor,
+        producto_id
+    ))
 
     conexion.commit()
 
-    filas_modificadas = cursor.rowcount
-
-    if filas_modificadas == 0:
+    if cursor.rowcount == 0:
         conexion.close()
 
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
+        raise HTTPException(
+            status_code=404,
+            detail="Producto no encontrado"
+        )
 
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT
-            productos.id,
-            productos.nombre,
-            productos.precio,
-            productos.categoria_id,
-            categorias.nombre AS categoria
-        FROM productos
-        JOIN categorias
-            ON productos.categoria_id = categorias.id
-        WHERE productos.id = ?
-    """,
-        (producto_id,),
-    )
+            p.id,
+            p.nombre,
+            p.precio,
+            p.id_categoria,
+            c.nombre AS categoria,
+            p.id_proveedor,
+            pr.nombre AS proveedor
+        FROM Producto p
+        JOIN Categoria c
+            ON p.id_categoria = c.id
+        JOIN Proveedor pr
+            ON p.id_proveedor = pr.id
+        WHERE p.id = ?
+    """, (producto_id,))
 
     fila = cursor.fetchone()
 
@@ -184,32 +242,37 @@ def actualizar_producto(
     return {
         "mensaje": "Producto actualizado",
         "producto": dict(fila),
-        "actualizado_por": usuario["username"],
+        "actualizado_por": usuario["username"]
     }
 
 
 @router.delete("/{producto_id}")
 def eliminar_producto(
-    producto_id: int, admin: dict = Depends(seguridad.requerir_admin)
+    producto_id: int,
+    admin: dict = Depends(seguridad.requerir_admin)
 ):
     conexion = db.obtener_conexion()
     cursor = conexion.cursor()
 
-    cursor.execute("DELETE FROM productos WHERE id = ?", (producto_id,))
+    cursor.execute(
+        "DELETE FROM Producto WHERE id = ?",
+        (producto_id,)
+    )
 
     conexion.commit()
 
-    filas_eliminadas = cursor.rowcount
-
-    if filas_eliminadas == 0:
+    if cursor.rowcount == 0:
         conexion.close()
 
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
+        raise HTTPException(
+            status_code=404,
+            detail="Producto no encontrado"
+        )
 
     conexion.close()
 
     return {
         "mensaje": "Producto eliminado",
         "producto_id": producto_id,
-        "eliminado_por": admin["username"],
+        "eliminado_por": admin["username"]
     }

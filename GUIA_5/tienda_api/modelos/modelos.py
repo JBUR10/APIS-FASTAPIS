@@ -3,5 +3,7 @@ from pydantic import BaseModel
 class ProductoEntrada(BaseModel):
     nombre: str
     precio: float
-    categoria: str
-    proveedor: str
+    id_categoria: int
+    id_proveedor: int
+
+    

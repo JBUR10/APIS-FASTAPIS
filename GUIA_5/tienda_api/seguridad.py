@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-
+from database import db
 import bcrypt
 import jwt
 from fastapi import Depends, HTTPException
@@ -18,26 +18,22 @@ def hashear_password(password: str) -> str:
 def verificar_password(plano: str, hasheado: str) -> bool:
     return bcrypt.checkpw(plano.encode(), hasheado.encode())
 
-usuarios = [
-    {
-        "username": "admin",
-        "nombre": "Administrador",
-        "password": hashear_password("admin123"),
-        "rol": "admin"
-    },
-    {
-        "username": "joel",
-        "nombre": "Joel Cliente",
-        "password": hashear_password("joel123"),
-        "rol": "cliente"
-    }
-]
-
-
 def buscar_usuario(username: str):
-    for usuario in usuarios:
-        if usuario["username"] == username:
-            return usuario
+    conexion = db.obtener_conexion()
+    cursor = conexion.cursor()
+
+    cursor.execute(
+        "SELECT * FROM Usuario WHERE username = ?",
+        (username,)
+    )
+
+    usuario = cursor.fetchone()
+
+    conexion.close()
+
+    if usuario:
+        return dict(usuario)
+
     return None
 
 def crear_token(username: str) -> str:
